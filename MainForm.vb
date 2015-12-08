@@ -101,6 +101,7 @@ Public Class MainForm
 
   'イメージファイルをマルチTiffファイルに変換する
   Private Sub Convert(imageFileNames As List(Of String))
+    'CreateMultiTiff("sample.Tiff", imageFileNames.ToArray, PropertyManager.GetCompressionScheme)
     ConvertImageFileToMultiTiff(
       GetSaveCallback,
       imageFileNames,
@@ -189,11 +190,20 @@ Public Class MainForm
       imageFileNames.ConvertAll(
         Function(f)
           Try
-            Dim bmp As BitmapFrame
+            Dim bmp As BitmapFrame = Nothing
             'BitmapはFileStreamで開かないとファイルがロックされ他プロセスからアクセスできなくなる
-            Using fs As FileStream = New FileStream(f, FileMode.Open, FileAccess.Read)
+            'Using fs As FileStream = New FileStream(f, FileMode.Open, FileAccess.Read)
+            '  bmp = BitmapFrame.Create(fs)
+            'End Using
+            Dim fs As FileStream = Nothing
+            Try
+              fs = New FileStream(f, FileMode.Open, FileAccess.Read)
               bmp = BitmapFrame.Create(fs)
-            End Using
+            Catch ex As Exception
+              If fs IsNot Nothing Then
+                fs.Close()
+              End If
+            End Try
             Return bmp
             'Return BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
           Catch ex As IOException
@@ -218,7 +228,7 @@ Public Class MainForm
   Private Function Save(savePath As String, encoder As TiffBitmapEncoder) As Boolean
     If encoder.Frames.Count > 0 Then
       If Overwrites(savePath) Then
-        MessageBox.Show(savePath)
+        'MessageBox.Show(savePath)
         Using outputFileStream As FileStream = New FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None)
           encoder.Save(outputFileStream)
         End Using
@@ -274,6 +284,38 @@ Public Class MainForm
       Return False
     End If
   End Function
+
+  'Public Sub CreateMultiTiff(ByVal savePath As String,
+  '                                ByVal imageFiles As String(),
+  '                                ByVal compressOption As TiffCompressOption)
+  '  'TiffBitmapEncoderを作成する
+  '  Dim encoder As New TiffBitmapEncoder()
+  '  '圧縮方法を変更する
+  '  encoder.Compression = compressOption
+
+  '  'For Each f As String In imageFiles
+  '  '  '画像ファイルからBitmapFrameを作成する
+  '  '  Dim bmpFrame As BitmapFrame =
+  '  '        BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
+  '  '  'フレームに追加する
+  '  '  encoder.Frames.Add(bmpFrame)
+  '  'Next
+
+  '  Dim bitmaps As List(Of BitmapFrame) = CreateBitmapList(imageFiles.ToList)
+  '  'CreateBitmapList(imageFileNames).
+  '  '  ForEach(Sub(bmp) encoder.Frames.Add(bmp))
+  '  For Each bmp As BitmapFrame In bitmaps
+  '    encoder.Frames.Add(bmp)
+  '  Next
+
+  '  '書き込むファイルを開く
+  '  Dim outputFileStrm As New FileStream(savePath,
+  '      FileMode.Create, FileAccess.Write, FileShare.None)
+  '  '保存する
+  '  encoder.Save(outputFileStrm)
+  '  '閉じる
+  '  outputFileStrm.Close()
+  'End Sub
 
   Private Sub btnConvert_Click(sender As Object, e As EventArgs) Handles btnConvert.Click
     Convert(GetOrderdFileNames)
