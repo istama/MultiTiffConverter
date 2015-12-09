@@ -154,22 +154,46 @@ Public Class MainForm
 
   'イメージファイルをマルチTiffファイルに変換する
   Private Sub ConvertImageFileToMultiTiff(saveCallback As SaveCallback, imageFileNames As List(Of String), compressionScheme As CompressionScheme, deletesOriginalImageFile As Boolean)
+    Dim deleteOriginalFile As Boolean = False
+    Dim fileStreams As List(Of FileStream) = Nothing
     Try
+      'イメージファイルへのストリームを作成する
+      fileStreams = CreateImageFileStream(imageFileNames)
       'マルチTiffを作成する
-      Dim tiffEncoder As TiffBitmapEncoder = CreateMultiTiffEncoder(imageFileNames, compressionScheme)
+      Dim tiffEncoder As TiffBitmapEncoder = CreateMultiTiffEncoder(fileStreams, compressionScheme)
       'Save("sample.tiff", tiffEncoder)
       'マルチTiffを保存 保存されればTrueを返す
-      If saveCallback(tiffEncoder) AndAlso deletesOriginalImageFile Then
-        '  '元のイメージファイルを削除する
-        'imageFileNames.ForEach(Sub(f) File.Delete(f))
-      End If
+      deleteOriginalFile = saveCallback(tiffEncoder) AndAlso deletesOriginalImageFile
     Catch ex As Exception
       MsgBox.ShowError(ex)
+    Finally
+      If fileStreams IsNot Nothing Then
+        fileStreams.ForEach(Sub(fs) fs.Close())
+      End If
     End Try
+
+    If deleteOriginalFile Then
+      '元のイメージファイルを削除する
+      imageFileNames.ForEach(Sub(f) File.Delete(f))
+    End If
   End Sub
 
+  Private Function CreateImageFileStream(imageFileNames As List(Of String)) As List(Of FileStream)
+    Dim fsList As New List(Of FileStream)
+    imageFileNames.ForEach(
+      Sub(f)
+        Try
+          fsList.Add(New FileStream(f, FileMode.Open, FileAccess.Read))
+        Catch ex As Exception
+          fsList.ForEach(Sub(fs) fs.Close())
+          Throw New Exception(f & " を開くことに失敗しました")
+        End Try
+      End Sub)
+    Return fsList
+  End Function
+
   'マルチTiffのエンコーダーを生成する
-  Private Function CreateMultiTiffEncoder(imageFileNames As List(Of String), Optional compressScheme As CompressionScheme = TiffCompressOption.Default) As TiffBitmapEncoder
+  Private Function CreateMultiTiffEncoder(imageFileStreams As List(Of FileStream), Optional compressScheme As CompressionScheme = TiffCompressOption.Default) As TiffBitmapEncoder
     'TiffBitmapEncoderを作成する
     Dim encoder As New TiffBitmapEncoder()
     '圧縮方法を変更する
@@ -177,7 +201,7 @@ Public Class MainForm
 
     'CreateBitmapList(imageFileNames).
     '  ForEach(Sub(bmp) encoder.Frames.Add(bmp))
-    For Each bmp As BitmapFrame In CreateBitmapList(imageFileNames)
+    For Each bmp As BitmapFrame In CreateBitmapList(imageFileStreams)
       encoder.Frames.Add(bmp)
     Next
 
@@ -185,34 +209,48 @@ Public Class MainForm
   End Function
 
   'bitmapを生成する
-  Private Function CreateBitmapList(imageFileNames As List(Of String)) As List(Of BitmapFrame)
+  Private Function CreateBitmapList(imageFileStreams As List(Of FileStream)) As List(Of BitmapFrame)
     Return _
-      imageFileNames.ConvertAll(
-        Function(f)
+      imageFileStreams.ConvertAll(
+        Function(fs)
+          Dim bmp As BitmapFrame = Nothing
           Try
-            Dim bmp As BitmapFrame = Nothing
-            'BitmapはFileStreamで開かないとファイルがロックされ他プロセスからアクセスできなくなる
-            'Using fs As FileStream = New FileStream(f, FileMode.Open, FileAccess.Read)
-            '  bmp = BitmapFrame.Create(fs)
-            'End Using
-            Dim fs As FileStream = Nothing
-            Try
-              fs = New FileStream(f, FileMode.Open, FileAccess.Read)
-              bmp = BitmapFrame.Create(fs)
-            Catch ex As Exception
-              If fs IsNot Nothing Then
-                fs.Close()
-              End If
-            End Try
-            Return bmp
-            'Return BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
-          Catch ex As IOException
-            Throw ex
+            bmp = BitmapFrame.Create(fs)
           Catch ex As Exception
-            Throw New Exception(f & " のイメージの取得に失敗しました。")
+            Throw New Exception(fs.Name & " のイメージの取得に失敗しました。")
           End Try
+          Return bmp
         End Function)
   End Function
+
+  'Private Function CreateBitmapList(imageFileNames As List(Of String)) As List(Of BitmapFrame)
+  '  Return _
+  '    imageFileNames.ConvertAll(
+  '      Function(f)
+  '        Try
+  '          Dim bmp As BitmapFrame = Nothing
+  '          'BitmapはFileStreamで開かないとファイルがロックされ他プロセスからアクセスできなくなる
+  '          'Using fs As FileStream = New FileStream(f, FileMode.Open, FileAccess.Read)
+  '          '  bmp = BitmapFrame.Create(fs)
+  '          'End Using
+  '          Dim fs As FileStream = Nothing
+  '          Try
+  '            fs = New FileStream(f, FileMode.Open, FileAccess.Read)
+  '            bmp = BitmapFrame.Create(fs)
+  '          Catch ex As Exception
+  '            If fs IsNot Nothing Then
+  '              fs.Close()
+  '            End If
+  '          End Try
+  '          Return bmp
+  '          'Return BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
+  '        Catch ex As IOException
+  '          Throw ex
+  '        Catch ex As Exception
+  '          Throw New Exception(f & " のイメージの取得に失敗しました。")
+  '        End Try
+  '      End Function)
+  'End Function
 
   Delegate Function SaveCallback(encoder As TiffBitmapEncoder) As Boolean
 
