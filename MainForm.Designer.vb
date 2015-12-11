@@ -24,6 +24,9 @@ Partial Class MainForm
   Private Sub InitializeComponent()
     Me.TabControl1 = New System.Windows.Forms.TabControl()
     Me.TabPage1 = New System.Windows.Forms.TabPage()
+    Me.btnDown = New System.Windows.Forms.Button()
+    Me.btnUp = New System.Windows.Forms.Button()
+    Me.btnDelete = New System.Windows.Forms.Button()
     Me.btnConvert = New System.Windows.Forms.Button()
     Me.lboxImageFileNames = New System.Windows.Forms.ListBox()
     Me.TabPage2 = New System.Windows.Forms.TabPage()
@@ -41,6 +44,7 @@ Partial Class MainForm
     Me.rBtnOrderToName = New System.Windows.Forms.RadioButton()
     Me.rBtnOrderToAuto = New System.Windows.Forms.RadioButton()
     Me.chkDeleteOriginalFiles = New System.Windows.Forms.CheckBox()
+    Me.rBtnOrderToTime = New System.Windows.Forms.RadioButton()
     Me.TabControl1.SuspendLayout()
     Me.TabPage1.SuspendLayout()
     Me.TabPage2.SuspendLayout()
@@ -62,6 +66,9 @@ Partial Class MainForm
     'TabPage1
     '
     Me.TabPage1.AllowDrop = True
+    Me.TabPage1.Controls.Add(Me.btnDown)
+    Me.TabPage1.Controls.Add(Me.btnUp)
+    Me.TabPage1.Controls.Add(Me.btnDelete)
     Me.TabPage1.Controls.Add(Me.btnConvert)
     Me.TabPage1.Controls.Add(Me.lboxImageFileNames)
     Me.TabPage1.Location = New System.Drawing.Point(4, 22)
@@ -72,11 +79,38 @@ Partial Class MainForm
     Me.TabPage1.Text = "画像ファイル変換"
     Me.TabPage1.UseVisualStyleBackColor = True
     '
+    'btnDown
+    '
+    Me.btnDown.Location = New System.Drawing.Point(102, 343)
+    Me.btnDown.Name = "btnDown"
+    Me.btnDown.Size = New System.Drawing.Size(91, 23)
+    Me.btnDown.TabIndex = 6
+    Me.btnDown.Text = "↓"
+    Me.btnDown.UseVisualStyleBackColor = True
+    '
+    'btnUp
+    '
+    Me.btnUp.Location = New System.Drawing.Point(8, 343)
+    Me.btnUp.Name = "btnUp"
+    Me.btnUp.Size = New System.Drawing.Size(91, 23)
+    Me.btnUp.TabIndex = 5
+    Me.btnUp.Text = "↑"
+    Me.btnUp.UseVisualStyleBackColor = True
+    '
+    'btnDelete
+    '
+    Me.btnDelete.Location = New System.Drawing.Point(196, 343)
+    Me.btnDelete.Name = "btnDelete"
+    Me.btnDelete.Size = New System.Drawing.Size(91, 23)
+    Me.btnDelete.TabIndex = 4
+    Me.btnDelete.Text = "削除"
+    Me.btnDelete.UseVisualStyleBackColor = True
+    '
     'btnConvert
     '
-    Me.btnConvert.Location = New System.Drawing.Point(184, 370)
+    Me.btnConvert.Location = New System.Drawing.Point(196, 370)
     Me.btnConvert.Name = "btnConvert"
-    Me.btnConvert.Size = New System.Drawing.Size(104, 23)
+    Me.btnConvert.Size = New System.Drawing.Size(92, 23)
     Me.btnConvert.TabIndex = 1
     Me.btnConvert.Text = "変換"
     Me.btnConvert.UseVisualStyleBackColor = True
@@ -89,7 +123,7 @@ Partial Class MainForm
     Me.lboxImageFileNames.ItemHeight = 12
     Me.lboxImageFileNames.Location = New System.Drawing.Point(8, 22)
     Me.lboxImageFileNames.Name = "lboxImageFileNames"
-    Me.lboxImageFileNames.Size = New System.Drawing.Size(280, 340)
+    Me.lboxImageFileNames.Size = New System.Drawing.Size(280, 316)
     Me.lboxImageFileNames.TabIndex = 0
     '
     'TabPage2
@@ -111,7 +145,7 @@ Partial Class MainForm
     '
     'btnBack
     '
-    Me.btnBack.Location = New System.Drawing.Point(93, 320)
+    Me.btnBack.Location = New System.Drawing.Point(93, 338)
     Me.btnBack.Name = "btnBack"
     Me.btnBack.Size = New System.Drawing.Size(75, 23)
     Me.btnBack.TabIndex = 15
@@ -120,7 +154,7 @@ Partial Class MainForm
     '
     'btnApply
     '
-    Me.btnApply.Location = New System.Drawing.Point(12, 320)
+    Me.btnApply.Location = New System.Drawing.Point(12, 338)
     Me.btnApply.Name = "btnApply"
     Me.btnApply.Size = New System.Drawing.Size(75, 23)
     Me.btnApply.TabIndex = 14
@@ -130,7 +164,7 @@ Partial Class MainForm
     'cboxCompressionScheme
     '
     Me.cboxCompressionScheme.FormattingEnabled = True
-    Me.cboxCompressionScheme.Location = New System.Drawing.Point(19, 280)
+    Me.cboxCompressionScheme.Location = New System.Drawing.Point(19, 298)
     Me.cboxCompressionScheme.Name = "cboxCompressionScheme"
     Me.cboxCompressionScheme.Size = New System.Drawing.Size(157, 20)
     Me.cboxCompressionScheme.TabIndex = 13
@@ -138,7 +172,7 @@ Partial Class MainForm
     'Label2
     '
     Me.Label2.AutoSize = True
-    Me.Label2.Location = New System.Drawing.Point(17, 264)
+    Me.Label2.Location = New System.Drawing.Point(17, 282)
     Me.Label2.Name = "Label2"
     Me.Label2.Size = New System.Drawing.Size(53, 12)
     Me.Label2.TabIndex = 12
@@ -150,7 +184,7 @@ Partial Class MainForm
     Me.GroupBox2.Controls.Add(Me.rBtnFileNameCreationModeDefault)
     Me.GroupBox2.Controls.Add(Me.rBtnFileNameCreationModeManual)
     Me.GroupBox2.Controls.Add(Me.rBtnFileNameCreationModeFirstPage)
-    Me.GroupBox2.Location = New System.Drawing.Point(17, 153)
+    Me.GroupBox2.Location = New System.Drawing.Point(17, 171)
     Me.GroupBox2.Name = "GroupBox2"
     Me.GroupBox2.Size = New System.Drawing.Size(259, 96)
     Me.GroupBox2.TabIndex = 11
@@ -200,12 +234,13 @@ Partial Class MainForm
     '
     'GroupBox1
     '
+    Me.GroupBox1.Controls.Add(Me.rBtnOrderToTime)
     Me.GroupBox1.Controls.Add(Me.rBtnOrderToManual)
     Me.GroupBox1.Controls.Add(Me.rBtnOrderToName)
     Me.GroupBox1.Controls.Add(Me.rBtnOrderToAuto)
     Me.GroupBox1.Location = New System.Drawing.Point(17, 41)
     Me.GroupBox1.Name = "GroupBox1"
-    Me.GroupBox1.Size = New System.Drawing.Size(259, 96)
+    Me.GroupBox1.Size = New System.Drawing.Size(259, 118)
     Me.GroupBox1.TabIndex = 10
     Me.GroupBox1.TabStop = False
     Me.GroupBox1.Text = "マルチTiff内での画像ファイルの順番"
@@ -213,7 +248,7 @@ Partial Class MainForm
     'rBtnOrderToManual
     '
     Me.rBtnOrderToManual.AutoSize = True
-    Me.rBtnOrderToManual.Location = New System.Drawing.Point(9, 69)
+    Me.rBtnOrderToManual.Location = New System.Drawing.Point(9, 93)
     Me.rBtnOrderToManual.Name = "rBtnOrderToManual"
     Me.rBtnOrderToManual.Size = New System.Drawing.Size(173, 16)
     Me.rBtnOrderToManual.TabIndex = 2
@@ -254,14 +289,26 @@ Partial Class MainForm
     Me.chkDeleteOriginalFiles.Text = "マルチTiff生成後に元の画像ファイルを削除する"
     Me.chkDeleteOriginalFiles.UseVisualStyleBackColor = True
     '
+    'rBtnOrderToTime
+    '
+    Me.rBtnOrderToTime.AutoSize = True
+    Me.rBtnOrderToTime.Location = New System.Drawing.Point(9, 69)
+    Me.rBtnOrderToTime.Name = "rBtnOrderToTime"
+    Me.rBtnOrderToTime.Size = New System.Drawing.Size(127, 16)
+    Me.rBtnOrderToTime.TabIndex = 3
+    Me.rBtnOrderToTime.TabStop = True
+    Me.rBtnOrderToTime.Text = "ファイルの作成日時順"
+    Me.rBtnOrderToTime.UseVisualStyleBackColor = True
+    '
     'MainForm
     '
     Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 12.0!)
     Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
     Me.ClientSize = New System.Drawing.Size(304, 424)
     Me.Controls.Add(Me.TabControl1)
+    Me.MaximizeBox = False
     Me.Name = "MainForm"
-    Me.Text = "MainForm2"
+    Me.Text = "マルチTiff変換"
     Me.TabControl1.ResumeLayout(False)
     Me.TabPage1.ResumeLayout(False)
     Me.TabPage2.ResumeLayout(False)
@@ -293,4 +340,8 @@ Partial Class MainForm
   Friend WithEvents rBtnOrderToName As RadioButton
   Friend WithEvents rBtnOrderToAuto As RadioButton
   Friend WithEvents chkDeleteOriginalFiles As CheckBox
+  Friend WithEvents btnDown As Button
+  Friend WithEvents btnUp As Button
+  Friend WithEvents btnDelete As Button
+  Friend WithEvents rBtnOrderToTime As RadioButton
 End Class

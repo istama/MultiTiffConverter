@@ -94,6 +94,7 @@ Namespace MultiTiffConverter
     Public Enum ImageFilesOrder As Integer
       Auto
       Name
+      Time
       Manual
     End Enum
 

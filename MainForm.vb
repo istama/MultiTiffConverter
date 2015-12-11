@@ -15,16 +15,30 @@ Public Class MainForm
     PropertyManager = New AppPropertyManager
 
     Dim imageFileNames As List(Of String) = GetDropedFileNames()
-    If imageFileNames.Count = 0 OrElse PropertyManager.GetImageFilesOrder = ImageFilesOrder.Manual Then
-      InitForm()
-      InitSvaeFileDialog()
-      imageFileNames.ForEach(Sub(f) lboxImageFileNames.Items.Add(f))
+    If imageFileNames.Count > 0 AndAlso
+       PropertyManager.GetImageFilesOrder <> ImageFilesOrder.Manual AndAlso
+       PropertyManager.GetFileNameCreationMode <> FileNameCreationMode.Manual Then
+      Convert(GetOrderedFileNames)
     Else
-      Convert(GetOrderdFileNames)
-      Me.Close()
+      InitForm()
+      InitSaveFileDialog()
+      imageFileNames.ForEach(Sub(f) lboxImageFileNames.Items.Add(f))
+
+      Loaded = True
     End If
 
-    Loaded = True
+
+  End Sub
+
+  Private Sub Form1_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
+    If Not Loaded Then
+      'ドラッグ＆ドロップで変換だけした場合はアプリを起ち上げない
+      Me.Close()
+    ElseIf GetDropedFileNames.Count > 0 AndAlso PropertyManager.GetImageFilesOrder <> ImageFilesOrder.Manual AndAlso PropertyManager.GetFileNameCreationMode = FileNameCreationMode.Manual Then
+      'ドラッグ＆ドロップで変換したファイルの名前をダイアログで入力する場合
+      Convert(GetOrderedFileNames)
+      Me.Close()
+    End If
   End Sub
 
   Private Sub InitForm()
@@ -44,6 +58,7 @@ Public Class MainForm
 
     rBtnOrderToAuto.Checked = order = ImageFilesOrder.Auto
     rBtnOrderToName.Checked = order = ImageFilesOrder.Name
+    rBtnOrderToTime.Checked = order = ImageFilesOrder.Time
     rBtnOrderToManual.Checked = order = ImageFilesOrder.Manual
   End Sub
 
@@ -81,38 +96,52 @@ Public Class MainForm
   End Function
 
   '並び替えたファイル名のリストを取得する
-  Private Function GetOrderdFileNames() As List(Of String)
+  Private Function GetOrderedFileNames() As List(Of String)
     Dim imageFileNames As List(Of String) = GetDropedFileNames()
     Dim order As ImageFilesOrder = PropertyManager.GetImageFilesOrder()
 
     If imageFileNames.Count = 0 OrElse order = ImageFilesOrder.Manual Then
-      Dim fileNames As New List(Of String)
-      For Each txt As String In lboxImageFileNames.Items
-        fileNames.Add(txt)
-      Next
-      Return fileNames
+      Return GetFileNamesInListBox()
     ElseIf order = ImageFilesOrder.Name
       imageFileNames.Sort()
       Return imageFileNames
+    ElseIf order = ImageFilesOrder.Time
+      Return SortFilesWithCreationTime(imageFileNames)
     Else
       Return imageFileNames
     End If
   End Function
 
+  'ファイルを作成日時順に並び替える
+  Private Function SortFilesWithCreationTime(fileNames As List(Of String)) As List(Of String)
+    Dim nameWithTimeList As List(Of Tuple(Of String, Date)) =
+      fileNames.ConvertAll(Function(f) Tuple.Create(f, File.GetCreationTime(f)))
+    Dim query = nameWithTimeList.OrderBy(Function(t) t.Item2.ToFileTime())
+    Return query.ToList.ConvertAll(Function(t) t.Item1)
+  End Function
+
   'イメージファイルをマルチTiffファイルに変換する
   Private Sub Convert(imageFileNames As List(Of String))
-    'CreateMultiTiff("sample.Tiff", imageFileNames.ToArray, PropertyManager.GetCompressionScheme)
-    ConvertImageFileToMultiTiff(
-      GetSaveCallback,
-      imageFileNames,
-      PropertyManager.GetCompressionScheme,
-      PropertyManager.IsAllowedToDeleteOriginalImageFiles)
+    If imageFileNames.Count > 0 Then
+      Try
+        ConvertImageFileToMultiTiff(
+        GetSaveCallback,
+        imageFileNames,
+        PropertyManager.GetCompressionScheme,
+        PropertyManager.IsAllowedToDeleteOriginalImageFiles)
+      Catch ex As Exception
+        MsgBox.ShowError(ex)
+      End Try
+    Else
+      MessageBox.Show("画像ファイルがありません。")
+    End If
   End Sub
 
   Private Function GetSaveCallback() As SaveCallback
     Dim fileNameCreationMode As FileNameCreationMode = PropertyManager.GetFileNameCreationMode
+
     If fileNameCreationMode = FileNameCreationMode.FirstPageName Then
-      Dim name As String = GetOrderdFileNames.First
+      Dim name As String = CutDirStr(GetOrderedFileNames.First)
       name = name.Substring(0, name.LastIndexOf(".")) & ".tiff"
       Return GetFuncForSaving(CreateNumberingFileNameIfAlreadyExists(name))
     ElseIf fileNameCreationMode = FileNameCreationMode.Manual
@@ -120,10 +149,20 @@ Public Class MainForm
     Else
       Dim name As String = txtDefaultFileName.Text
       If name.Length = 0 Then
-        name = MP.Details.Sys.App.GetCurrentDirectory & "\新しいファイル.tiff"
+        name = "新しいファイル.tiff"
       End If
       Return GetFuncForSaving(CreateNumberingFileNameIfAlreadyExists(name))
     End If
+  End Function
+
+  Private Function CutDirStr(path As String) As String
+    Dim idx As Integer = path.LastIndexOf(System.IO.Path.DirectorySeparatorChar)
+    Return _
+      If(path.Length = idx - 1,
+        "",
+        If(idx < 0,
+          path,
+          path.Substring(idx + 1)))
   End Function
 
   Private Function CreateNumberingFileNameIfAlreadyExists(name As String) As String
@@ -164,8 +203,6 @@ Public Class MainForm
       'Save("sample.tiff", tiffEncoder)
       'マルチTiffを保存 保存されればTrueを返す
       deleteOriginalFile = saveCallback(tiffEncoder) AndAlso deletesOriginalImageFile
-    Catch ex As Exception
-      MsgBox.ShowError(ex)
     Finally
       If fileStreams IsNot Nothing Then
         fileStreams.ForEach(Sub(fs) fs.Close())
@@ -199,58 +236,40 @@ Public Class MainForm
     '圧縮方法を変更する
     encoder.Compression = compressScheme
 
-    'CreateBitmapList(imageFileNames).
-    '  ForEach(Sub(bmp) encoder.Frames.Add(bmp))
-    For Each bmp As BitmapFrame In CreateBitmapList(imageFileStreams)
-      encoder.Frames.Add(bmp)
-    Next
+    CreateBitmapList(imageFileStreams).ForEach(
+        Sub(bmp) encoder.Frames.Add(bmp))
+    'For Each bmp As BitmapFrame In CreateBitmapList(imageFileStreams)
+    '  encoder.Frames.Add(bmp)
+    'Next
 
     Return encoder
   End Function
 
   'bitmapを生成する
   Private Function CreateBitmapList(imageFileStreams As List(Of FileStream)) As List(Of BitmapFrame)
-    Return _
-      imageFileStreams.ConvertAll(
-        Function(fs)
-          Dim bmp As BitmapFrame = Nothing
-          Try
-            bmp = BitmapFrame.Create(fs)
-          Catch ex As Exception
-            Throw New Exception(fs.Name & " のイメージの取得に失敗しました。")
-          End Try
-          Return bmp
-        End Function)
-  End Function
+    Dim bmpList As New List(Of BitmapFrame)
+    imageFileStreams.ForEach(
+        Sub(fs)
+          'BitmapDecoderを作成する
+          Dim decoder As BitmapDecoder =
+            BitmapDecoder.Create(fs, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.Default)
 
-  'Private Function CreateBitmapList(imageFileNames As List(Of String)) As List(Of BitmapFrame)
-  '  Return _
-  '    imageFileNames.ConvertAll(
-  '      Function(f)
-  '        Try
-  '          Dim bmp As BitmapFrame = Nothing
-  '          'BitmapはFileStreamで開かないとファイルがロックされ他プロセスからアクセスできなくなる
-  '          'Using fs As FileStream = New FileStream(f, FileMode.Open, FileAccess.Read)
-  '          '  bmp = BitmapFrame.Create(fs)
-  '          'End Using
-  '          Dim fs As FileStream = Nothing
-  '          Try
-  '            fs = New FileStream(f, FileMode.Open, FileAccess.Read)
-  '            bmp = BitmapFrame.Create(fs)
-  '          Catch ex As Exception
-  '            If fs IsNot Nothing Then
-  '              fs.Close()
-  '            End If
-  '          End Try
-  '          Return bmp
-  '          'Return BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
-  '        Catch ex As IOException
-  '          Throw ex
-  '        Catch ex As Exception
-  '          Throw New Exception(f & " のイメージの取得に失敗しました。")
-  '        End Try
-  '      End Function)
-  'End Function
+          'フレーム数を取得する
+          For Each frame As BitmapFrame In decoder.Frames
+            bmpList.Add(frame)
+          Next
+
+          'Dim bmp As BitmapFrame = Nothing
+          'Try
+          '  bmp = BitmapFrame.Create(fs)
+          '  bmpList.Add(bmp)
+          'Catch ex As Exception
+          '  Throw New Exception(fs.Name & " のイメージの取得に失敗しました。")
+          'End Try
+        End Sub)
+
+    Return bmpList
+  End Function
 
   Delegate Function SaveCallback(encoder As TiffBitmapEncoder) As Boolean
 
@@ -289,7 +308,7 @@ Public Class MainForm
         DialogResult.Yes
   End Function
 
-  Private Sub InitSvaeFileDialog()
+  Private Sub InitSaveFileDialog()
     SaveFileDialog = New SaveFileDialog()
 
     'はじめのファイル名を指定する
@@ -323,54 +342,82 @@ Public Class MainForm
     End If
   End Function
 
-  'Public Sub CreateMultiTiff(ByVal savePath As String,
-  '                                ByVal imageFiles As String(),
-  '                                ByVal compressOption As TiffCompressOption)
-  '  'TiffBitmapEncoderを作成する
-  '  Dim encoder As New TiffBitmapEncoder()
-  '  '圧縮方法を変更する
-  '  encoder.Compression = compressOption
+  Private Sub btnUp_Click(sender As Object, e As EventArgs) Handles btnUp.Click
+    Dim idx As Integer = lboxImageFileNames.SelectedIndex
+    If idx > 0 Then
+      Dim item As String = lboxImageFileNames.SelectedItem
 
-  '  'For Each f As String In imageFiles
-  '  '  '画像ファイルからBitmapFrameを作成する
-  '  '  Dim bmpFrame As BitmapFrame =
-  '  '        BitmapFrame.Create(New Uri(f, UriKind.RelativeOrAbsolute))
-  '  '  'フレームに追加する
-  '  '  encoder.Frames.Add(bmpFrame)
-  '  'Next
+      lboxImageFileNames.Items.RemoveAt(idx)
+      lboxImageFileNames.Items.Insert(idx - 1, item)
+      lboxImageFileNames.SelectedIndex = idx - 1
+    End If
+  End Sub
 
-  '  Dim bitmaps As List(Of BitmapFrame) = CreateBitmapList(imageFiles.ToList)
-  '  'CreateBitmapList(imageFileNames).
-  '  '  ForEach(Sub(bmp) encoder.Frames.Add(bmp))
-  '  For Each bmp As BitmapFrame In bitmaps
-  '    encoder.Frames.Add(bmp)
-  '  Next
+  Private Sub btnDown_Click(sender As Object, e As EventArgs) Handles btnDown.Click
+    Dim idx As Integer = lboxImageFileNames.SelectedIndex
+    If idx >= 0 AndAlso idx < lboxImageFileNames.Items.Count - 1 Then
+      Dim item As String = lboxImageFileNames.SelectedItem
 
-  '  '書き込むファイルを開く
-  '  Dim outputFileStrm As New FileStream(savePath,
-  '      FileMode.Create, FileAccess.Write, FileShare.None)
-  '  '保存する
-  '  encoder.Save(outputFileStrm)
-  '  '閉じる
-  '  outputFileStrm.Close()
-  'End Sub
+      lboxImageFileNames.Items.RemoveAt(idx)
+      lboxImageFileNames.Items.Insert(idx + 1, item)
+      lboxImageFileNames.SelectedIndex = idx + 1
+    End If
+  End Sub
+
+  Private Sub btnDelete_Click(sender As Object, e As EventArgs) Handles btnDelete.Click
+    Dim idx As Integer = lboxImageFileNames.SelectedIndex
+    If idx >= 0 Then
+      lboxImageFileNames.Items.RemoveAt(idx)
+      If idx < lboxImageFileNames.Items.Count Then
+        lboxImageFileNames.SelectedIndex = idx
+      ElseIf idx = lboxImageFileNames.Items.Count
+        lboxImageFileNames.SelectedIndex = idx - 1
+      End If
+    End If
+  End Sub
 
   Private Sub btnConvert_Click(sender As Object, e As EventArgs) Handles btnConvert.Click
-    Convert(GetOrderdFileNames)
+    '変換ボタンからマルチtiffを生成するときは、画像の順番はリストBoxを優先する
+    Convert(GetFileNamesInListBox)
   End Sub
 
   Private Sub ListBox1_DragEnter(sender As Object, e As DragEventArgs) Handles lboxImageFileNames.DragEnter
-
-    'ドラッグされている内容が文字列型に変換可能な場合
-    If e.Data.GetDataPresent(GetType(String)) Then
-      'コピーを許可するようにドラッグ元に通知する
-      e.Effect = DragDropEffects.Copy
+    'データ形式の確認
+    If e.Data.GetDataPresent(DataFormats.FileDrop) = False Then
+      Return
     End If
+
+    'ドラッグしているファイル／フォルダの取得
+    Dim FilePath() As String = CType(e.Data.GetData(DataFormats.FileDrop), String())
+
+    For idx As Integer = 0 To FilePath.Length - 1
+      If Not System.IO.File.Exists(FilePath(idx)) Then
+        Return
+      End If
+    Next idx
+
+    'ドロップ可能な場合は、エフェクトを変える
+    e.Effect = DragDropEffects.Copy
+
+    ''
+    ''ドラッグされている内容が文字列型に変換可能な場合
+    'If e.Data.GetDataPresent(GetType(String)) Then
+    '  'コピーを許可するようにドラッグ元に通知する
+    '  e.Effect = DragDropEffects.Copy
+    'End If
 
   End Sub
 
   Private Sub ListBox1_DragDrop(sender As Object, e As DragEventArgs) Handles lboxImageFileNames.DragDrop
-    MessageBox.Show("Drop")
+    'ドラッグしているファイル／フォルダの取得
+    Dim FilePath() As String = CType(e.Data.GetData(DataFormats.FileDrop), String())
+
+    For Each path As String In FilePath
+      lboxImageFileNames.Items.Add(path)
+    Next
+
+    ''
+    'MessageBox.Show("Drop")
     'ListBox1.Items.Add(DirectCast(sender, String))
   End Sub
 
@@ -384,6 +431,10 @@ Public Class MainForm
 
   Private Sub rBtnOrderToName_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnOrderToName.CheckedChanged
     SetImageFileOrder(rBtnOrderToName, ImageFilesOrder.Name)
+  End Sub
+
+  Private Sub rBtnOrderToTime_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnOrderToTime.CheckedChanged
+    SetImageFileOrder(rBtnOrderToTime, ImageFilesOrder.Time)
   End Sub
 
   Private Sub rBtnOrderToManual_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnOrderToManual.CheckedChanged
@@ -434,6 +485,14 @@ Public Class MainForm
     PropertyManager.Reset()
     InitForm()
   End Sub
+
+  Private Function GetFileNamesInListBox() As List(Of String)
+    Dim names As New List(Of String)
+    For Each f As String In lboxImageFileNames.Items
+      names.Add(f)
+    Next
+    Return names
+  End Function
 
 
 End Class
