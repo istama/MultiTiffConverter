@@ -10,6 +10,7 @@ Public Class MainForm
 
   Private PropertyManager As AppPropertyManager
   Private SaveFileDialog As SaveFileDialog
+  Private FolderBrowserDialog As FolderBrowserDialog
 
   Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
     PropertyManager = New AppPropertyManager
@@ -17,24 +18,26 @@ Public Class MainForm
     Dim imageFileNames As List(Of String) = GetDropedFileNames()
     If imageFileNames.Count > 0 AndAlso
        PropertyManager.GetImageFilesOrder <> ImageFilesOrder.Manual AndAlso
-       PropertyManager.GetFileNameCreationMode <> FileNameCreationMode.Manual Then
+       PropertyManager.GetFileDestMode <> FileDestMode.Manual Then
+      InitTxtDefaultName()
+      InitTxtDefaultFileDest()
+
       Convert(GetOrderedFileNames)
     Else
       InitForm()
       InitSaveFileDialog()
+      InitFolderBrowserDialog()
       imageFileNames.ForEach(Sub(f) lboxImageFileNames.Items.Add(f))
 
       Loaded = True
     End If
-
-
   End Sub
 
   Private Sub Form1_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
     If Not Loaded Then
       'ドラッグ＆ドロップで変換だけした場合はアプリを起ち上げない
       Me.Close()
-    ElseIf GetDropedFileNames.Count > 0 AndAlso PropertyManager.GetImageFilesOrder <> ImageFilesOrder.Manual AndAlso PropertyManager.GetFileNameCreationMode = FileNameCreationMode.Manual Then
+    ElseIf GetDropedFileNames.Count > 0 AndAlso PropertyManager.GetImageFilesOrder <> ImageFilesOrder.Manual AndAlso PropertyManager.GetFileDestMode = FileDestMode.Manual Then
       'ドラッグ＆ドロップで変換したファイルの名前をダイアログで入力する場合
       Convert(GetOrderedFileNames)
       Me.Close()
@@ -46,6 +49,8 @@ Public Class MainForm
     InitRBtnImageFilesOrder()
     InitRBtnFileNameCreationMode()
     InitTxtDefaultName()
+    InitRBtnFileDestMode()
+    InitTxtDefaultFileDest()
     InitCBoxComressionScheme()
   End Sub
 
@@ -66,12 +71,23 @@ Public Class MainForm
     Dim mode As FileNameCreationMode = PropertyManager.GetFileNameCreationMode
 
     rBtnFileNameCreationModeFirstPage.Checked = mode = FileNameCreationMode.FirstPageName
-    rBtnFileNameCreationModeManual.Checked = mode = FileNameCreationMode.Manual
     rBtnFileNameCreationModeDefault.Checked = mode = FileNameCreationMode.DefaultName
+  End Sub
+
+  Private Sub InitRBtnFileDestMode()
+    Dim mode As FileDestMode = PropertyManager.GetFileDestMode
+
+    rBtnFileDestModeFirstPage.AutoCheck = mode = FileDestMode.FirstPageDirectory
+    rBtnFileDestModeManual.Checked = mode = FileDestMode.Manual
+    rBtnFileDestModeDefault.Checked = mode = FileDestMode.DefaultDirectory
   End Sub
 
   Private Sub InitTxtDefaultName()
     txtDefaultFileName.Text = PropertyManager.GetDefaultFileName
+  End Sub
+
+  Private Sub InitTxtDefaultFileDest()
+    txtDefaultFileDest.Text = PropertyManager.GetDefaultFileDest
   End Sub
 
   Private Sub InitCBoxComressionScheme()
@@ -125,10 +141,10 @@ Public Class MainForm
     If imageFileNames.Count > 0 Then
       Try
         ConvertImageFileToMultiTiff(
-        GetSaveCallback,
-        imageFileNames,
-        PropertyManager.GetCompressionScheme,
-        PropertyManager.IsAllowedToDeleteOriginalImageFiles)
+          GetSaveCallback,
+          imageFileNames,
+          PropertyManager.GetCompressionScheme,
+          PropertyManager.IsAllowedToDeleteOriginalImageFiles)
       Catch ex As Exception
         MsgBox.ShowError(ex)
       End Try
@@ -138,20 +154,29 @@ Public Class MainForm
   End Sub
 
   Private Function GetSaveCallback() As SaveCallback
-    Dim fileNameCreationMode As FileNameCreationMode = PropertyManager.GetFileNameCreationMode
+    Dim fileName As String = ""
 
+    Dim fileNameCreationMode As FileNameCreationMode = PropertyManager.GetFileNameCreationMode
     If fileNameCreationMode = FileNameCreationMode.FirstPageName Then
       Dim name As String = CutDirStr(GetOrderedFileNames.First)
-      name = name.Substring(0, name.LastIndexOf(".")) & ".tiff"
-      Return GetFuncForSaving(CreateNumberingFileNameIfAlreadyExists(name))
-    ElseIf fileNameCreationMode = FileNameCreationMode.Manual
-      Return GetFuncForSavingInDialog()
+      fileName = name.Substring(0, name.LastIndexOf(".")) & ".tiff"
     Else
       Dim name As String = txtDefaultFileName.Text
       If name.Length = 0 Then
         name = "新しいファイル.tiff"
       End If
-      Return GetFuncForSaving(CreateNumberingFileNameIfAlreadyExists(name))
+      fileName = name
+    End If
+
+    Dim fileDestMode As FileDestMode = PropertyManager.GetFileDestMode
+    If fileDestMode = FileDestMode.FirstPageDirectory Then
+      Dim firstPage As String = GetOrderedFileNames.First
+      Return GetFuncForSaving(CutFileNameStr(firstPage) & "\" & CreateNumberingFileNameIfAlreadyExists(fileName))
+    ElseIf fileDestMode = FileDestMode.DefaultDirectory
+      Dim path As String = txtDefaultFileDest.Text
+      Return GetFuncForSaving(CreateNumberingFileNameIfAlreadyExists(path & "\" & fileName))
+    Else
+      Return GetFuncForSavingInDialog(fileName)
     End If
   End Function
 
@@ -163,6 +188,16 @@ Public Class MainForm
         If(idx < 0,
           path,
           path.Substring(idx + 1)))
+  End Function
+
+  Private Function CutFileNameStr(path As String) As String
+    Dim idx As Integer = path.LastIndexOf(System.IO.Path.DirectorySeparatorChar)
+    Return _
+      If(path.Length = idx - 1,
+        "",
+        If(idx < 0,
+          "",
+          path.Substring(0, idx)))
   End Function
 
   Private Function CreateNumberingFileNameIfAlreadyExists(name As String) As String
@@ -277,7 +312,8 @@ Public Class MainForm
     Return Function(encoder) Save(filePath, encoder)
   End Function
 
-  Private Function GetFuncForSavingInDialog() As SaveCallback
+  Private Function GetFuncForSavingInDialog(defaultFileName As String) As SaveCallback
+    SaveFileDialog.FileName = defaultFileName
     Return Function(encoder) SaveInDialog(encoder)
   End Function
 
@@ -451,10 +487,6 @@ Public Class MainForm
     SetFileNameCreationMode(sender, FileNameCreationMode.FirstPageName)
   End Sub
 
-  Private Sub rBtnFileNameCreationModeManual_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnFileNameCreationModeManual.CheckedChanged
-    SetFileNameCreationMode(sender, FileNameCreationMode.Manual)
-  End Sub
-
   Private Sub rBtnFileNameCreationModeDefault_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnFileNameCreationModeDefault.CheckedChanged
     SetFileNameCreationMode(sender, FileNameCreationMode.DefaultName)
   End Sub
@@ -471,6 +503,49 @@ Public Class MainForm
     End If
   End Sub
 
+  Private Sub rBtnFileDestModeFirstPage_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnFileDestModeFirstPage.CheckedChanged
+    SetFileDestMode(sender, FileDestMode.FirstPageDirectory)
+  End Sub
+
+  Private Sub rBtnFileDestModeManual_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnFileDestModeManual.CheckedChanged
+    SetFileDestMode(sender, FileDestMode.Manual)
+  End Sub
+
+  Private Sub rBtnFileDestModeDefault_CheckedChanged(sender As Object, e As EventArgs) Handles rBtnFileDestModeDefault.CheckedChanged
+    SetFileDestMode(sender, FileDestMode.DefaultDirectory)
+  End Sub
+
+  Private Sub SetFileDestMode(rBtn As RadioButton, destMode As FileDestMode)
+    If Loaded AndAlso rBtn.Checked Then
+      PropertyManager.SetFileDestMode(destMode)
+    End If
+  End Sub
+
+  Private Sub btnShowDirDialog_Click(sender As Object, e As EventArgs) Handles btnShowDirDialog.Click
+    'ダイアログを表示する
+    If FolderBrowserDialog.ShowDialog(Me) = DialogResult.OK Then
+      '選択されたフォルダを表示する
+      txtDefaultFileDest.Text = FolderBrowserDialog.SelectedPath
+    End If
+  End Sub
+
+  Private Sub InitFolderBrowserDialog()
+    'FolderBrowserDialogクラスのインスタンスを作成
+    FolderBrowserDialog = New FolderBrowserDialog
+
+    '上部に表示する説明テキストを指定する
+    FolderBrowserDialog.Description = "出力先フォルダを指定してください。"
+    'ルートフォルダを指定する
+    'デフォルトでDesktop
+    'fbd.RootFolder = Environment.SpecialFolder.Desktop
+    '最初に選択するフォルダを指定する
+    'RootFolder以下にあるフォルダである必要がある
+    'fbd.SelectedPath = "C:\Windows"
+    'ユーザーが新しいフォルダを作成できるようにする
+    'デフォルトでTrue
+    FolderBrowserDialog.ShowNewFolderButton = True
+  End Sub
+
   Private Sub cboxCompressionScheme_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboxCompressionScheme.SelectedIndexChanged
     Dim selectedItem As String = cboxCompressionScheme.SelectedItem
     PropertyManager.SetCompressionScheme(MyEnum.GetId(GetType(CompressionScheme), selectedItem, CompressionScheme.Auto))
@@ -478,6 +553,7 @@ Public Class MainForm
 
   Private Sub btnApply_Click(sender As Object, e As EventArgs) Handles btnApply.Click
     PropertyManager.SetDefaultFileName(txtDefaultFileName.Text)
+    PropertyManager.SetDefaultFileDest(txtDefaultFileDest.Text)
     PropertyManager.Flush()
   End Sub
 

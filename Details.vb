@@ -240,6 +240,10 @@ Namespace Details
       Public Shared Function GetCurrentDirectory() As String
         Return System.IO.Directory.GetCurrentDirectory()
       End Function
+
+      Public Shared Function GetApplicationDirectory() As String
+        Return My.Application.Info.DirectoryPath.ToString()
+      End Function
     End Class
   End Namespace
 

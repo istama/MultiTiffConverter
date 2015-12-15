@@ -7,13 +7,15 @@ Namespace MultiTiffConverter
   Namespace App
 
     Public Class AppProperties
-      Private Shared SETTING_FILE_NAME = "setting.properties"
+      Private Shared SETTING_FILE_NAME = MP.Details.Sys.App.GetApplicationDirectory & "\setting.properties"
 
       Public Shared KEY_ALLOW_TO_DELETE_ORIGINAL_IMAGE_FILES = "AllowToDeleteOriginalImageFiles"
       Public Shared KEY_IMAGE_FILES_ORDER = "ImageFilesOrder"
       Public Shared KEY_COMPRESSION_SCHEME = "CompressionScheme"
       Public Shared KEY_FILE_NAME_CREATION_MODE = "FileNameCreationMode"
       Public Shared KEY_DEFAULT_FILE_NAME = "DefaultFileName"
+      Public Shared KEY_FILE_DEST_MODE = "FileDestinationMode"
+      Public Shared KEY_DEFAULT_FILE_DEST = "DefaultFileDestination"
 
       Public Shared MANAGER = New PropertyManager(SETTING_FILE_NAME, DefaultSettingProperties(), True)
 
@@ -24,6 +26,8 @@ Namespace MultiTiffConverter
         dict(KEY_COMPRESSION_SCHEME) = CompressionScheme.Auto.ToString
         dict(KEY_FILE_NAME_CREATION_MODE) = FileNameCreationMode.DefaultName.ToString
         dict(KEY_DEFAULT_FILE_NAME) = "新しいファイル.tiff"
+        dict(KEY_FILE_DEST_MODE) = FileDestMode.FirstPageDirectory.ToString
+        dict(KEY_DEFAULT_FILE_DEST) = MP.Details.Sys.App.GetApplicationDirectory
         Return dict
       End Function
     End Class
@@ -59,6 +63,15 @@ Namespace MultiTiffConverter
         Return Properties(AppProperties.KEY_DEFAULT_FILE_NAME)
       End Function
 
+      Public Function GetFileDestMode() As FileDestMode
+        Dim mode As String = Properties(AppProperties.KEY_FILE_DEST_MODE)
+        Return MyEnum.GetId(GetType(FileDestMode), mode, FileDestMode.FirstPageDirectory)
+      End Function
+
+      Public Function GetDefaultFileDest() As String
+        Return Properties(AppProperties.KEY_DEFAULT_FILE_DEST)
+      End Function
+
       Public Sub AllowToDeleteOriginalImageFiles(allow As Boolean)
         Properties(AppProperties.KEY_ALLOW_TO_DELETE_ORIGINAL_IMAGE_FILES) = allow.ToString
       End Sub
@@ -80,6 +93,15 @@ Namespace MultiTiffConverter
 
       Public Sub SetDefaultFileName(name As String)
         Properties(AppProperties.KEY_DEFAULT_FILE_NAME) = name
+      End Sub
+
+      Public Sub SetFileDestMode(mode As FileDestMode)
+        Dim str As String = MyEnum.GetName(GetType(FileDestMode), mode, FileDestMode.FirstPageDirectory)
+        Properties(AppProperties.KEY_FILE_DEST_MODE) = str
+      End Sub
+
+      Public Sub SetDefaultFileDest(dest As String)
+        Properties(AppProperties.KEY_DEFAULT_FILE_DEST) = dest
       End Sub
 
       Public Sub Flush()
@@ -110,8 +132,13 @@ Namespace MultiTiffConverter
 
     Public Enum FileNameCreationMode As Integer
       FirstPageName
-      Manual
       DefaultName
+    End Enum
+
+    Public Enum FileDestMode As Integer
+      FirstPageDirectory
+      Manual
+      DefaultDirectory
     End Enum
   End Namespace
 End Namespace

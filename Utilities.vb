@@ -69,12 +69,17 @@ Namespace Utils
         If Not hasRead Then
           Try
             Properties = PropertyAccessor.GetProp(FilePath)
+
             If EnableDefPropertyKeysOnly Then
               Dim nProp As IDictionary(Of String, String) = RemoveKeysThatDoseNotContainsToDefProperties(Properties)
               If nProp.Count() < Properties.Count() Then
                 PropertyAccessor.SetProp(FilePath, nProp)
                 Properties = nProp
               End If
+            End If
+
+            If Properties.Count < DefProperties.Count Then
+              Append(DefProperties)
             End If
           Catch ex As System.IO.FileNotFoundException
             PropertyAccessor.SetProp(FilePath, DefProperties)
